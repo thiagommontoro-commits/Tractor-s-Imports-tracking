@@ -2,6 +2,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import requests
 import os
+import glob
 from datetime import datetime
 import json
 import time
@@ -118,12 +119,30 @@ def criar_fig_pais(df_agg):
         ]), direction="down", x=0.05, xanchor="left", y=1.15, yanchor="top")]
     )
     fig.update_traces(textfont_size=12, textangle=0, cliponaxis=False)
+    fig.update_yaxes(title_text="Valor Total (US$ FOB)")
     fig.update_yaxes(title_text=TRANSLATIONS['pt']['total_fob_value'])
     fig.update_xaxes(categoryorder='total descending')
     return fig
 
+def gerar_dashboard(df: pd.DataFrame = None):
 def gerar_dashboard(df: pd.DataFrame):
     print("🚀 Iniciando a geração do dashboard...")
+    project_path = "."
+
+    if df is None:
+        search_pattern = os.path.join(project_path, "Imports database_*.xlsx")
+        lista_arquivos = glob.glob(search_pattern)
+        if not lista_arquivos:
+            print(f"❌ ERRO: Nenhum arquivo Excel encontrado.")
+            return
+
+        caminho_arquivo = max(lista_arquivos, key=os.path.getctime)
+        print(f"📊 Lendo dados do arquivo: {os.path.basename(caminho_arquivo)}")
+        try:
+            df = pd.read_excel(caminho_arquivo)
+        except Exception as e:
+            print(f"❌ ERRO: Falha ao ler o arquivo Excel. Causa: {e}")
+            return
 
     # --- LIMPEZA E BLINDAGEM DE DADOS ---
     print("   -> Limpando e preparando os dados...")
@@ -167,5 +186,5 @@ def main():
     gerar_dashboard(df_fresco)
 
 if __name__ == "__main__":
+    gerar_dashboard()
     main()
-
