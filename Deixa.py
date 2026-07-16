@@ -78,48 +78,47 @@ TRANSLATIONS = {
 def extrair_dados_comex(anos, ncm_codes):
     """
     Busca os dados de importação na API do Comex Stat para os anos e NCMs especificados.
+    Aplica atrasos programados para respeitar as políticas de limite de requisição (Rate Limit).
     """
     print(f"🔎 Buscando dados para os anos: {anos} e NCMs: {len(ncm_codes)}")
     all_data = []
-    
-    # CORREÇÃO 1: URL corrigida de api. para api-
     base_url = "https://api-comexstat.mdic.gov.br/general"
     
-    # CORREÇÃO 2: Fake User-Agent para contornar bloqueios em servidores Cloud/GitHub
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
     }
 
     for ano in anos:
         for ncm in ncm_codes:
             params = {
-                "flow": "2",  # NOTA: Na API mais atual, a documentação exige "import". Se o erro persistir, altere "2" para "import".
+                "flow": "2",  # Fluxo de Importação
                 "period": str(ano),
-                "partner": "0", # Todos os países
+                "partner": "0", # Todos os parceiros comerciais
                 "product": ncm,
                 "type": "raw"
             }
             
-            retries = 3
+            retries = 4
             for attempt in range(retries):
                 try:
-                    # Incluído 'headers' na requisição
-                    response = requests.get(base_url, params=params, headers=headers, timeout=60)
+                    response = requests.get(base_url, params=params, headers=headers, timeout=45)
                     response.raise_for_status()
                     
                     data = response.json()
                     if data:
-                        print(f"   ✅ Sucesso para Ano: {ano}, NCM: {ncm}. {len(data)} registros encontrados.")
+                        print(f"   ✅ Sucesso para Ano: {ano}, NCM: {ncm}. {len(data)} registros.")
                         all_data.extend(data)
                     else:
-                        print(f"   ⚠️ Nenhum dado para Ano: {ano}, NCM: {ncm}.")
+                        print(f"   ⚠️ Nenhum dado retornado para Ano: {ano}, NCM: {ncm}.")
                     
-                    break # Sai do loop de retentativas se for bem-sucedido
+                    # Se foi bem sucedido, sai do loop de retentativas
+                    break
 
                 except requests.exceptions.HTTPError as e:
-                    if e.response.status_code == 429: # Erro de "Too Many Requests"
-                        wait_time = (attempt + 1) * 5 # Espera 5, 10, 15 segundos
-                        print(f"   ⏳ API Rate Limit atingido. Tentando novamente em {wait_time} segundos...")
+                    if e.response.status_code == 429:
+                        # Se tomarmos um 429, recuamos agressivamente
+                        wait_time = (attempt + 1) * 10
+                        print(f"   ⏳ API Rate Limit atingido (429). Aguardando {wait_time} segundos para tentar novamente...")
                         time.sleep(wait_time)
                     else:
                         print(f"   ❌ Erro HTTP para Ano: {ano}, NCM: {ncm}. Status: {e.response.status_code}")
@@ -128,7 +127,11 @@ def extrair_dados_comex(anos, ncm_codes):
                     print(f"   ❌ Erro de conexão para Ano: {ano}, NCM: {ncm}. Causa: {e}")
                     break
             else:
-                print(f"   ❌ Falha ao buscar dados para Ano: {ano}, NCM: {ncm} após {retries} tentativas.")
+                print(f"   ❌ Falha definitiva para Ano: {ano}, NCM: {ncm} após {retries} tentativas.")
+
+            # PAUSA DE CORTESIA OBRIGATÓRIA ENTRE REQUISIÇÕES (Evita o erro 429 preventivamente)
+            # 3.5 segundos é um tempo seguro para a API do ComexStat
+            time.sleep(3.5)
 
     if not all_data:
         return None
