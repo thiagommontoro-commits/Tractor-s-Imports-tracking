@@ -8,6 +8,10 @@ on:
   schedule:
     - cron: '0 8 * * 1'
 
+# Permite que a automação salve os arquivos gerados (index.html e o .xlsx) de volta no repositório.
+permissions:
+  contents: write
+
 jobs:
   update-data:
     runs-on: ubuntu-latest
@@ -37,3 +41,4 @@ jobs:
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: 'chore: Atualiza base de dados de importação'
+          commit_author: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>
